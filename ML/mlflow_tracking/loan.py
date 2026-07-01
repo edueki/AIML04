@@ -19,12 +19,17 @@ data.columns = [i.strip() for i in data.columns]
 
 #Feature Engineering
 
+# Handle missing values
+data['credit_score'] = data['credit_score'].fillna(data['credit_score'].mean())
+
+
 #Training Data
 train_data = data.drop(columns="loan_status")
 train_data = train_data.drop(columns='loan_id')
 
 train_data['total_assets_value'] = train_data['residential_assets_value'] + train_data['commercial_assets_value'] + train_data['luxury_assets_value'] + train_data['bank_asset_value']
 train_data.drop(columns=['residential_assets_value','commercial_assets_value','luxury_assets_value','bank_asset_value'], inplace=True)
+
 
 # Target Data
 target_data = data['loan_status']
@@ -44,20 +49,48 @@ target_data = le.fit_transform(target_data)
 x_train, x_test, y_train, y_test = train_test_split(train_data, target_data, train_size=0.1, random_state=2)
 
 #Logistic Regression
-LR_params = {'C': 10, 'penalty': 'l2', 'solver': 'lbfgs', 'max_iter': 500, 'fit_intercept': True, 'class_weight': 'balanced', 'random_state': 6}
+LR_params = {'C': 10, 'penalty': 'l2', 'solver': 'lbfgs', 'max_iter': 1000, 'fit_intercept': True, 'class_weight': 'balanced', 'random_state': 12}
 LR_model = LogisticRegression(**LR_params)
 LR_model.fit(x_train, y_train)
 
 # Random Forest
-RF_params = {'n_estimators': 200, 'max_depth': 20, 'criterion': "gini", 'max_leaf_nodes': 50, 'random_state': 6}
+RF_params = {'n_estimators': 200, 'max_depth': 20, 'criterion': "gini", 'max_leaf_nodes': 50, 'random_state': 12}
 RF_model = RandomForestClassifier(**RF_params)
 RF_model = RF_model.fit(x_train, y_train)
 
 # Decision Tree
-DT_params = {"max_depth": 3, 'criterion': "gini", 'random_state': 6}
+DT_params = {"max_depth": 3, 'criterion': "gini", 'random_state': 12}
 DT_model = DecisionTreeClassifier(**DT_params)
 DT_model = DT_model.fit(x_train, y_train)
 
-mlflow.set_tracking_uri("http://localhost:8000")
+mlflow.set_tracking_uri("http://localhost:8080")
+
+experiment_name = "Loan Experiment"
+
+mlflow.set_experiment(experiment_name)
+
+# Generate predictions and evaluate the model accuracy and publish the details to mlflow
+def experiment(model, x_test, y_test, model_name, model_params ):
+    with mlflow.start_run():
+        y_pred = model.predict(x_test)
+        score = metrics.accuracy_score(y_test, y_pred)
+        mlflow.log_params(model_params)
+        mlflow.log_metrics({"Accuracy": score})
+        mlflow.sklearn.log_model(model, model_name)
+
+experiment(model=LR_model, x_test=x_test, y_test=y_test, model_name="Logistic Regression", model_params=LR_params)
+experiment(model=RF_model, x_test=x_test, y_test=y_test, model_name="Random Forest", model_params=RF_params)
+experiment(model=DT_model, x_test=x_test, y_test=y_test, model_name="Decision Tree", model_params=DT_params)
+
+
+
+
+
+
+
+
+
+
+
 
 
